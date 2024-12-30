@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cinema Booking</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" defer></script>
+  <style>
+    .movie-card {
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .movie-card:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .movie-card img {
+      height: 300px;
+      object-fit: cover;
+    }
+
+    .seat {
+      width: 40px;
+      height: 40px;
+      text-align: center;
+      line-height: 40px;
+      margin: 5px;
+      border-radius: 5px;
+      border: 1px solid #ffc107;
+      cursor: pointer;
+    }
+
+    .seat.selected {
+      background-color: #ffc107;
+      color: #000;
+    }
+
+    .seat.occupied {
+      background-color: #6c757d;
+      color: #fff;
+      cursor: not-allowed;
+    }
+
+    .screen {
+      width: 100%;
+      height: 20px;
+      background-color: #ffc107;
+      margin-bottom: 20px;
+      text-align: center;
+      line-height: 20px;
+      font-weight: bold;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body class="bg-dark text-white">
+  <header class="bg-secondary py-3">
+    <div class="container d-flex justify-content-between align-items-center">
+      <h1 class="text-warning">Cinema Booking</h1>
+      <button id="historyBtn" class="btn btn-warning">Booking History</button>
+    </div>
+  </header>
+
+  <main class="container my-4" id="content">
+    <!-- Movie List -->
+    <section id="movies">
+      <h2 class="text-warning mb-4">Now Playing</h2>
+      <div class="row g-4">
+        <div id="movieCards" class="d-flex flex-wrap justify-content-start gap-4">
+          <!-- Movie Cards -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Seat Selection -->
+    <section id="seats" class="d-none">
+      <h2 class="text-warning mb-4">Select Seats</h2>
+      <div class="bg-secondary p-4 rounded">
+        <div class="screen">Screen</div>
+        <div class="d-grid gap-3" id="seatContainer"></div>
+        <div class="mt-4 d-flex justify-content-between">
+          <button class="btn btn-outline-light" onclick="goBackToMovies()">Back</button>
+          <button class="btn btn-warning" onclick="proceedToPayment()">Continue</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Payment Section -->
+    <section id="payment" class="d-none">
+      <h2 class="text-warning mb-4">Payment</h2>
+      <div class="bg-secondary p-4 rounded">
+        <h5 class="text-warning" id="selectedMovieTitle"></h5>
+        <p>
+          <strong>Seats Selected:</strong> <span id="paymentSeats">-</span><br>
+          <strong>Total Price:</strong> Rp <span id="totalPrice">0</span>
+        </p>
+        <h5 class="text-warning">Choose Payment Method</h5>
+        <div class="d-grid gap-2">
+          <button class="btn btn-warning" onclick="redirectToPayment('GoPay')">GoPay</button>
+          <button class="btn btn-warning" onclick="redirectToPayment('ShopeePay')">ShopeePay</button>
+          <button class="btn btn-warning" onclick="redirectToPayment('Dana')">Dana</button>
+        </div>
+        <div class="mt-4 d-flex justify-content-between">
+          <button class="btn btn-outline-light" onclick="goBackToSeats()">Back</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Booking Confirmation -->
+    <section id="confirmation" class="d-none">
+      <h2 class="text-warning mb-4">Booking Confirmed</h2>
+      <div class="bg-secondary p-4 rounded">
+        <p>Your booking has been confirmed! Thank you for using our service.</p>
+        <button class="btn btn-warning" onclick="goBackToMovies()">Book Another Ticket</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const movies = [
+    { 
+        title: "Avengers: Endgame", 
+        duration: "3h 2m", 
+        genre: "Action, Adventure", 
+        price: 70000,
+        image: "images/Avengers_Endgame_poster.jpg",  // Gambar lokal di folder 'images'
+        sessions: [
+          { time: "10:00 AM", room: "Room 1", seatsBooked: ["A1", "A2"] },
+          { time: "1:00 PM", room: "Room 2", seatsBooked: ["A1", "B1"] },
+          { time: "4:00 PM", room: "Room 3", seatsBooked: ["C1", "D1"] }
+        ]
+      },
+      { 
+        title: "Avengers: Endgame", 
+        duration: "3h 2m", 
+        genre: "Action, Adventure", 
+        price: 70000,
+        image: "images/frozen2.jpg",  // Gambar lokal di folder 'images'
+        sessions: [
+          { time: "10:00 AM", room: "Room 1", seatsBooked: ["A1", "A2"] },
+          { time: "1:00 PM", room: "Room 2", seatsBooked: ["A1", "B1"] },
+          { time: "4:00 PM", room: "Room 3", seatsBooked: ["C1", "D1"] }
+        ]
+      },
+    ];
+
+    let selectedSeats = [];
+    let selectedMovie = {};
+    let selectedSession = {};
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderMovies();
+
+      // Add event listener for Booking History button
+      document.getElementById('historyBtn').addEventListener('click', () => {
+        window.location.href = 'history.html'; // Redirect to history.html
+      });
+    });
+
+    function renderMovies() {
+      const movieCards = movies.map(movie => ` 
+        <div class="col-md-4">
+          <div class="card bg-secondary text-white movie-card">
+            <img src="${movie.image}" alt="${movie.title}" class="card-img-top">
+            <div class="card-body">
+              <h5 class="card-title text-warning">${movie.title}</h5>
+              <p class="card-text">
+                <strong>Duration:</strong> ${movie.duration}<br>
+                <strong>Genre:</strong> ${movie.genre}<br>
+                <strong>Price:</strong> Rp ${movie.price}
+              </p>
+              <button class="btn btn-warning w-100" onclick="selectMovie('${movie.title}')">Book Now</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+      document.getElementById('movieCards').innerHTML = movieCards;
+    }
+
+    function selectMovie(title) {
+      selectedMovie = movies.find(movie => movie.title === title);
+      document.getElementById('movies').classList.add('d-none');
+      document.getElementById('seats').classList.remove('d-none');
+      renderSessions();
+    }
+
+    function renderSessions() {
+      const sessionOptions = selectedMovie.sessions.map((session, index) => `
+        <button class="btn btn-outline-warning w-100" onclick="selectSession(${index})">
+          ${session.time} - ${session.room}
+        </button>
+      `).join('');
+      document.getElementById('seatContainer').innerHTML = sessionOptions;
+    }
+
+    function selectSession(index) {
+      selectedSession = selectedMovie.sessions[index];
+      renderSeatSelection();
+    }
+
+    function renderSeatSelection() {
+      const rows = ['A', 'B', 'C', 'D', 'E'];
+      const seatsHTML = rows.map(row => `
+        <div class="d-flex justify-content-center gap-2">
+          ${Array.from({ length: 20 }, (_, i) => {
+            const seatNumber = `${row}${i + 1}`;
+            const isOccupied = selectedSession.seatsBooked.includes(seatNumber);
+            return `<button class="btn btn-outline-warning seat ${isOccupied ? 'occupied' : ''}" 
+                          data-seat="${seatNumber}" onclick="toggleSeat('${seatNumber}', this)" ${isOccupied ? 'disabled' : ''}>
+                          ${seatNumber}
+                    </button>`;
+          }).join('')}
+        </div>
+      `).join('');
+      document.getElementById('seatContainer').innerHTML = seatsHTML;
+    }
+
+    function toggleSeat(seat, element) {
+      if (element.classList.contains('occupied')) return;
+      if (selectedSeats.includes(seat)) {
+        selectedSeats = selectedSeats.filter(s => s !== seat);
+        element.classList.remove('selected');
+      } else {
+        selectedSeats.push(seat);
+        element.classList.add('selected');
+      }
+    }
+
+    function proceedToPayment() {
+      document.getElementById('seats').classList.add('d-none');
+      document.getElementById('payment').classList.remove('d-none');
+      updateSummary();
+    }
+
+    function updateSummary() {
+      document.getElementById('paymentSeats').innerText = selectedSeats.join(', ');
+      document.getElementById('totalPrice').innerText = selectedSeats.length * selectedMovie.price;
+    }
+
+    function goBackToMovies() {
+      document.getElementById('movies').classList.remove('d-none');
+      document.getElementById('seats').classList.add('d-none');
+      document.getElementById('payment').classList.add('d-none');
+      document.getElementById('confirmation').classList.add('d-none');
+      selectedSeats = [];
+    }
+
+    function redirectToPayment(method) {
+      alert(`Redirecting to ${method}...`);
+      goBackToMovies();
+    }
+  </script>
+</body>
+</html>
